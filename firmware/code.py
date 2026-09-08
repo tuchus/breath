@@ -1,12 +1,10 @@
 """USB MIDI breath controller for the Adafruit QT Py RP2040.
 
-Sensors (STEMMA QT chain):  QT Py -> BMP585 (0x47) -> AS5600 (0x36)
+Sensor (STEMMA QT):  QT Py -> BMP585 (0x47)
 
-  * BMP585 barometric sensor, ported version, sits at the end of a tube from
-    the mouthpiece.  Blowing raises the pressure above ambient; that delta is
-    mapped to MIDI CC 2 (Breath Controller).
-  * AS5600 magnetic angle sensor (optional second axis, e.g. a bite lever or
-    thumb wheel with a diametric magnet).  Mapped to a second CC.
+The BMP585 barometric sensor, ported version, sits at the end of a tube from
+the mouthpiece.  Blowing raises the pressure above ambient; that delta is
+mapped to MIDI CC 2 (Breath Controller).
 
 Copy this file plus the libraries listed in ../README.md to CIRCUITPY/.
 Tune the constants in the TUNING section; use tools/monitor.py to pick them.
@@ -33,11 +31,6 @@ SMOOTHING = 0.35          # 0..1, weight of the newest sample (1 = no smoothing)
 BASELINE_TRACK = 0.001    # how fast the ambient baseline follows slow drift
 BASELINE_SECONDS = 1.0    # ambient averaging time at boot (don't blow!)
 
-ANGLE_CC = 1              # second axis CC (1 = mod wheel). None to disable.
-ANGLE_MIN = 0             # AS5600 raw_angle (0..4095) that maps to CC 0
-ANGLE_MAX = 1024          # raw_angle that maps to CC 127 (may be < ANGLE_MIN)
-ANGLE_SMOOTHING = 0.5
-
 DEBUG = False             # print pressure/CC to the serial console ~10x/sec
 # --------------------------------------------------------------------------
 
@@ -54,19 +47,6 @@ bmp.temperature_oversampling_rate = adafruit_bmp5xx.BMP5XX_OVERSAMPLING_1X
 bmp.pressure_iir_filter = adafruit_bmp5xx.BMP5XX_IIR_FILTER_COEFF_3
 bmp.output_data_rate = adafruit_bmp5xx.BMP5XX_ODR_140_HZ
 bmp.mode = adafruit_bmp5xx.BMP5XX_POWERMODE_NORMAL
-
-# --- AS5600 (optional) -------------------------------------------------------
-angle_sensor = None
-if ANGLE_CC is not None:
-    try:
-        import adafruit_as5600
-
-        angle_sensor = adafruit_as5600.AS5600(i2c)
-        if not angle_sensor.magnet_detected:
-            print("AS5600 found but no magnet detected; angle axis disabled")
-            angle_sensor = None
-    except (ImportError, ValueError) as exc:
-        print("AS5600 not available:", exc)
 
 # --- NeoPixel feedback (optional) -------------------------------------------
 pixel = None
@@ -111,8 +91,6 @@ if pixel:
 smoothed = 0.0
 delta = 0.0
 last_breath = -1
-angle_smoothed = None
-last_angle_cc = -1
 last_debug = time.monotonic()
 span = FULL_SCALE_HPA - THRESHOLD_HPA
 
@@ -150,28 +128,11 @@ while True:
             level = int(shaped * 255)
             pixel.fill((level, 0, 40 - level * 40 // 255))
 
-    if angle_sensor is not None:
-        raw = angle_sensor.raw_angle
-        # Handle wrap-around by choosing the representation nearest the range.
-        lo, hi = ANGLE_MIN, ANGLE_MAX
-        if hi < lo:
-            lo, hi = hi, lo
-            frac = 1.0 - clamp01((raw - lo) / (hi - lo))
-        else:
-            frac = clamp01((raw - lo) / (hi - lo))
-        if angle_smoothed is None:
-            angle_smoothed = frac
-        angle_smoothed += ANGLE_SMOOTHING * (frac - angle_smoothed)
-        angle_cc = int(angle_smoothed * 127 + 0.5)
-        if angle_cc != last_angle_cc:
-            send_cc(ANGLE_CC, angle_cc)
-            last_angle_cc = angle_cc
-
     if DEBUG:
         now = time.monotonic()
         if now - last_debug > 0.1:
             last_debug = now
             print(
-                "delta=%6.2f hPa  smoothed=%6.2f  cc=%d  angle_cc=%d"
-                % (delta, smoothed, last_breath, last_angle_cc)
+                "delta=%6.2f hPa  smoothed=%6.2f  cc=%d"
+                % (delta, smoothed, last_breath)
             )

@@ -1,5 +1,5 @@
-# Copy to CIRCUITPY/code.py to verify wiring. Expected output with both
-# sensors on the STEMMA QT chain:  ['0x36', '0x47']   (AS5600, BMP585)
+# Copy to CIRCUITPY/code.py to verify wiring. Expected output with the
+# BMP585 on the STEMMA QT connector:  ['0x47']
 import time
 import board
 

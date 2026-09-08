@@ -2,16 +2,13 @@
 
 ## Wiring
 
-Everything is STEMMA QT, no soldering:
+One STEMMA QT cable, no soldering:
 
 ```
-QT Py RP2040 ──100mm──▶ BMP585 (0x47) ──100mm──▶ AS5600 (0x36)
+QT Py RP2040 ──100mm──▶ BMP585 (0x47)
 ```
 
-Order on the chain doesn't matter electrically. The two addresses don't
-collide, and both boards have a connector on each side so they pass the bus
-through. Check with `firmware/tools/i2c_scan.py`; you should see `0x36` and
-`0x47`.
+Check with `firmware/tools/i2c_scan.py`; you should see `0x47`.
 
 ## Air path
 
@@ -58,17 +55,3 @@ just past the mouthpiece.
 These depend heavily on the bleed hole size. Measure your own with
 `firmware/tools/monitor.py` before setting `THRESHOLD_HPA` and
 `FULL_SCALE_HPA` in `code.py`.
-
-## AS5600 second axis
-
-The AS5600 needs a **diametrically** magnetised disc magnet (6 mm is the
-usual size) centred over the chip, 0.5 – 3 mm away, rotating in the plane of
-the board. Ideas that pair well with breath:
-
-- **Bite / lip lever** on the mouthpiece with a return spring, mapped to
-  pitch or vibrato.
-- **Thumb wheel** where your hand rests, mapped to CC 1 (mod) or CC 11
-  (expression).
-
-Set `ANGLE_MIN` / `ANGLE_MAX` in `code.py` to the `raw_angle` values at the
-two ends of travel, read from `tools/monitor.py`.

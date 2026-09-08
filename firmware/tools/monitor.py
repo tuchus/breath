@@ -9,12 +9,6 @@ import adafruit_bmp5xx
 i2c = board.STEMMA_I2C()
 bmp = adafruit_bmp5xx.BMP5XX.over_i2c(i2c)
 
-try:
-    import adafruit_as5600
-    mag = adafruit_as5600.AS5600(i2c)
-except (ImportError, ValueError):
-    mag = None
-
 # 1 s ambient baseline
 n, total = 0, 0.0
 t_end = time.monotonic() + 1.0
@@ -30,7 +24,5 @@ while True:
     delta = p - baseline
     peak = max(peak, delta)
     line = "p=%8.2f hPa  delta=%7.2f hPa  peak=%6.2f  T=%.1fC" % (p, delta, peak, temp_c)
-    if mag is not None:
-        line += "  angle=%4d/4095 magnet=%s" % (mag.raw_angle, mag.magnet_detected)
     print(line)
     time.sleep(0.05)
