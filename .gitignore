@@ -1,0 +1,9 @@
+# CircuitPython drive junk
+.Trashes
+.fseventsd
+.metadata_never_index
+boot_out.txt
+# Editor / OS
+.DS_Store
+*.swp
+__pycache__/
