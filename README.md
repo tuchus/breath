@@ -23,8 +23,8 @@ Plus: ~3 mm ID silicone tubing and a mouthpiece (a straw will do to start).
 3. **Build the air path.** Tube + bleed hole + mouthpiece. See
    `docs/hardware.md`. Re-run the monitor and re-note the values; the bleed
    hole changes them a lot.
-4. **Send MIDI.** Copy `firmware/code.py` and `firmware/boot.py` to the
-   board, set `THRESHOLD_HPA` / `FULL_SCALE_HPA` from step 3, and check the
+4. **Send MIDI.** Copy `firmware/code.py`, `firmware/breath.py` and
+   `firmware/boot.py` to the board, set `THRESHOLD_HPA` / `FULL_SCALE_HPA` from step 3, and check the
    "Breath Controller" device shows up in your DAW sending CC 2.
 5. **Tune feel.** `CURVE`, `SMOOTHING`, and bleed hole size, in a loop with
    a breath-aware patch (a wind instrument or anything with CC 2 → volume /
@@ -46,8 +46,8 @@ Pico 2 W; only the wiring differs (see `docs/hardware.md`).
    - `adafruit_bus_device/` (folder)
    - `adafruit_register/` (folder)
    - `neopixel.mpy` (optional, QT Py only, onboard LED level meter)
-3. Copy `firmware/code.py` and `firmware/boot.py` to `CIRCUITPY/`.
-   `boot.py` only takes effect after a power cycle.
+3. Copy `firmware/code.py`, `firmware/breath.py` and `firmware/boot.py` to
+   `CIRCUITPY/`. `boot.py` only takes effect after a power cycle.
 
 `usb_midi` is built into CircuitPython, so no MIDI library is needed; the
 firmware writes the 3-byte CC messages directly.
@@ -61,11 +61,28 @@ firmware writes the 3-byte CC messages directly.
 Channel 1. All of this is in the `TUNING` block at the top of
 `firmware/code.py`.
 
+## Desktop tools
+
+- **`tools/bench.html`**: open in Chrome or Edge. Shows CC 2 live from the
+  controller over Web MIDI, and plots the pressure delta from the serial
+  console over Web Serial, with peak and rest-noise readouts for picking
+  `THRESHOLD_HPA` and `FULL_SCALE_HPA`. Can save a serial capture to a file.
+- **`tools/simulate.py`**: replays a synthetic breath phrase (or a saved
+  capture with `--trace`) through the mapping and prints an ASCII plot, so
+  you can compare `--curve` and `--smoothing` settings without hardware.
+- **`tests/`**: `python3 -m pytest` checks the mapping logic on the desktop.
+  The mapping lives in `firmware/breath.py`, which has no board
+  dependencies and runs unchanged under CircuitPython and CPython.
+
 ## Layout
 
 ```
-firmware/code.py          main controller loop
+firmware/code.py          main controller loop (sensor, MIDI, LED)
+firmware/breath.py        pressure -> CC mapping, board-independent
 firmware/boot.py          USB device name
-firmware/tools/           i2c_scan.py, monitor.py (bring-up and tuning)
-docs/hardware.md          air path, moisture, bleed hole
+firmware/tools/           i2c_scan.py, monitor.py (bring-up and tuning, run on the board)
+tools/bench.html          browser MIDI meter + serial plotter
+tools/simulate.py         desktop replay of the mapping
+tests/test_breath.py      pytest suite for the mapping
+docs/hardware.md          air path, moisture, bleed hole, wiring
 ```

@@ -20,6 +20,8 @@ import board
 import usb_midi
 import adafruit_bmp5xx
 
+from breath import BreathMapper
+
 # --------------------------------------------------------------------------
 # TUNING
 # --------------------------------------------------------------------------
@@ -96,10 +98,6 @@ def send_cc(cc, value):
     midi_out.write(_cc_buf)
 
 
-def clamp01(x):
-    return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
-
-
 # --- Ambient baseline -------------------------------------------------------
 print("Measuring ambient pressure for %.1fs, don't blow..." % BASELINE_SECONDS)
 n, total = 0, 0.0
@@ -110,15 +108,21 @@ while time.monotonic() < t_end:
         n += 1
 baseline = total / max(n, 1)
 print("baseline %.2f hPa (%d samples)" % (baseline, n))
+
+mapper = BreathMapper(
+    threshold=THRESHOLD_HPA,
+    full_scale=FULL_SCALE_HPA,
+    curve=CURVE,
+    smoothing=SMOOTHING,
+    baseline_track=BASELINE_TRACK,
+    bits=14 if SEND_14BIT else 7,
+)
+mapper.set_baseline(baseline)
 if pixel:
     pixel.fill((0, 40, 0))
 
 # --- Main loop --------------------------------------------------------------
-smoothed = 0.0
-delta = 0.0
-last_breath = -1
 last_debug = time.monotonic()
-span = FULL_SCALE_HPA - THRESHOLD_HPA
 
 send_cc(BREATH_CC, 0)
 if SEND_14BIT:
@@ -126,35 +130,17 @@ if SEND_14BIT:
 
 while True:
     if bmp.data_ready:
-        pressure = bmp.pressure
-        delta = pressure - baseline
+        value = mapper.update(bmp.pressure)
+        if value is not None:
+            send_cc(BREATH_CC, mapper.msb)
+            if SEND_14BIT:
+                send_cc(BREATH_CC_LSB, mapper.lsb)
 
-        # Track slow ambient drift only while the player is not blowing.
-        if delta < THRESHOLD_HPA:
-            baseline += BASELINE_TRACK * delta
-
-        smoothed += SMOOTHING * (delta - smoothed)
-
-        norm = clamp01((smoothed - THRESHOLD_HPA) / span)
-        shaped = norm ** CURVE if norm > 0.0 else 0.0
-
-        if SEND_14BIT:
-            value = int(shaped * 16383 + 0.5)
-            if value != last_breath:
-                send_cc(BREATH_CC, value >> 7)
-                send_cc(BREATH_CC_LSB, value & 0x7F)
-                last_breath = value
-        else:
-            value = int(shaped * 127 + 0.5)
-            if value != last_breath:
-                send_cc(BREATH_CC, value)
-                last_breath = value
-
-        if pixel:
-            level = int(shaped * 255)
-            pixel.fill((level, 0, 40 - level * 40 // 255))
-        elif led is not None:
-            led.value = value > 0
+            if pixel:
+                level = mapper.value * 255 // mapper.max_value
+                pixel.fill((level, 0, 40 - level * 40 // 255))
+            elif led is not None:
+                led.value = value > 0
 
     if DEBUG:
         now = time.monotonic()
@@ -162,5 +148,5 @@ while True:
             last_debug = now
             print(
                 "delta=%6.2f hPa  smoothed=%6.2f  cc=%d"
-                % (delta, smoothed, last_breath)
+                % (mapper.delta, mapper.smoothed, mapper.value)
             )

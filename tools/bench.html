@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breath Bench</title>
+<style>
+  :root {
+    --bg: #f5f4f0; --fg: #1d1d1b; --muted: #6b6963; --panel: #ffffff;
+    --line: #d9d7d0; --accent: #c2410c; --accent-soft: #fde7d8; --ok: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a; --fg: #ececea; --muted: #9a9a94; --panel: #202226;
+      --line: #34363b; --accent: #fb923c; --accent-soft: #3a2415; --ok: #4ade80;
+    }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 20px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--panel); border: 1px solid var(--line);
+            border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  section h2 { font-size: 15px; margin: 0 0 10px; display: flex;
+               align-items: center; gap: 10px; }
+  .status { font-size: 12px; color: var(--muted); font-weight: normal; }
+  .status.on { color: var(--ok); }
+  button { font: inherit; padding: 6px 12px; border-radius: 6px;
+           border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+           cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  select { font: inherit; padding: 5px 8px; border-radius: 6px;
+           border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  .meter { height: 28px; border-radius: 6px; background: var(--accent-soft);
+           overflow: hidden; position: relative; }
+  .meter > div { height: 100%; width: 0; background: var(--accent);
+                 transition: width 40ms linear; }
+  .meter span { position: absolute; right: 10px; top: 0; line-height: 28px;
+                font-variant-numeric: tabular-nums; font-weight: 600; }
+  canvas { width: 100%; height: 160px; display: block; border-radius: 6px;
+           background: var(--bg); border: 1px solid var(--line); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+           gap: 10px; margin-top: 10px; }
+  .stat { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat small { color: var(--muted); }
+  .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Breath Bench</h1>
+  <p class="sub">Open this file in Chrome or Edge. Web MIDI and Web Serial don't exist in Firefox or Safari.</p>
+
+  <section>
+    <h2>MIDI <span id="midi-status" class="status">not connected</span></h2>
+    <div class="row">
+      <button id="midi-connect">Connect MIDI</button>
+      <select id="midi-input" disabled></select>
+    </div>
+    <div class="meter"><div id="cc-bar"></div><span id="cc-val">CC 2 = 0</span></div>
+    <canvas id="cc-plot" width="860" height="160"></canvas>
+    <div class="stats">
+      <div class="stat"><b id="cc-peak">0</b><small>peak</small></div>
+      <div class="stat"><b id="cc-rate">0</b><small>msgs / s</small></div>
+      <div class="stat"><b id="cc-14">–</b><small>14-bit (CC 34 seen)</small></div>
+    </div>
+    <p class="hint">Runs against <code>firmware/code.py</code>. If nothing moves, check the input list shows "Breath Controller".</p>
+  </section>
+
+  <section>
+    <h2>Serial <span id="ser-status" class="status">not connected</span></h2>
+    <div class="row">
+      <button id="ser-connect">Connect serial</button>
+      <button id="ser-reset" disabled>Reset peak</button>
+      <button id="ser-save" disabled>Save capture</button>
+    </div>
+    <canvas id="ser-plot" width="860" height="160"></canvas>
+    <div class="stats">
+      <div class="stat"><b id="ser-delta">0.00</b><small>delta hPa</small></div>
+      <div class="stat"><b id="ser-peak">0.00</b><small>peak hPa</small></div>
+      <div class="stat"><b id="ser-noise">0.00</b><small>rest noise (p-p, last 2 s)</small></div>
+      <div class="stat"><b id="ser-rate">0</b><small>lines / s</small></div>
+    </div>
+    <p class="hint">Runs against <code>firmware/tools/monitor.py</code> (or <code>code.py</code> with <code>DEBUG = True</code>).
+      Close any other serial console first; only one program can hold the port.
+      "Save capture" downloads the raw lines for <code>tools/simulate.py --trace</code>.</p>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ---------- shared plot helper ----------
+  function makePlot(canvas, maxY, seconds) {
+    const ctx = canvas.getContext('2d');
+    const pts = [];           // [t, y]
+    function draw() {
+      const w = canvas.width, h = canvas.height;
+      const css = getComputedStyle(document.documentElement);
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = css.getPropertyValue('--line').trim();
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const y = h - (h * i / 4);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+      if (pts.length < 2) return;
+      const now = pts[pts.length - 1][0];
+      const t0 = now - seconds * 1000;
+      while (pts.length > 2 && pts[1][0] < t0) pts.shift();
+      ctx.strokeStyle = css.getPropertyValue('--accent').trim();
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      pts.forEach(([t, y], i) => {
+        const x = (t - t0) / (seconds * 1000) * w;
+        const yy = h - Math.min(1, Math.max(0, y / maxY())) * h;
+        i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy);
+      });
+      ctx.stroke();
+    }
+    return {
+      push(y) { pts.push([performance.now(), y]); },
+      draw,
+      clear() { pts.length = 0; },
+    };
+  }
+
+  // ---------- MIDI ----------
+  const midiStatus = document.getElementById('midi-status');
+  const midiSelect = document.getElementById('midi-input');
+  const ccBar = document.getElementById('cc-bar');
+  const ccVal = document.getElementById('cc-val');
+  const ccPeakEl = document.getElementById('cc-peak');
+  const ccRateEl = document.getElementById('cc-rate');
+  const cc14El = document.getElementById('cc-14');
+  const ccPlot = makePlot(document.getElementById('cc-plot'), () => 127, 10);
+  let midiAccess = null, midiInput = null, ccPeak = 0, ccCount = 0, lsb = 0, seen14 = false;
+
+  function attachInput(id) {
+    if (midiInput) midiInput.onmidimessage = null;
+    midiInput = midiAccess.inputs.get(id) || null;
+    if (!midiInput) return;
+    midiInput.onmidimessage = (e) => {
+      const [st, d1, d2] = e.data;
+      if ((st & 0xF0) !== 0xB0) return;
+      if (d1 === 34) { lsb = d2; seen14 = true; cc14El.textContent = 'yes'; return; }
+      if (d1 !== 2) return;
+      ccCount++;
+      const v = d2;
+      ccPeak = Math.max(ccPeak, v);
+      ccBar.style.width = (v / 127 * 100) + '%';
+      ccVal.textContent = seen14 ? `CC 2 = ${v}  (14-bit ${(v << 7) | lsb})` : `CC 2 = ${v}`;
+      ccPeakEl.textContent = ccPeak;
+      ccPlot.push(v);
+    };
+    midiStatus.textContent = 'listening to ' + midiInput.name;
+    midiStatus.classList.add('on');
+  }
+
+  function refreshInputs() {
+    midiSelect.innerHTML = '';
+    let pick = null;
+    for (const [id, inp] of midiAccess.inputs) {
+      const o = document.createElement('option');
+      o.value = id; o.textContent = inp.name;
+      midiSelect.appendChild(o);
+      if (!pick || /breath/i.test(inp.name)) pick = id;
+    }
+    midiSelect.disabled = midiAccess.inputs.size === 0;
+    if (pick) { midiSelect.value = pick; attachInput(pick); }
+    else { midiStatus.textContent = 'no MIDI inputs found'; midiStatus.classList.remove('on'); }
+  }
+
+  document.getElementById('midi-connect').onclick = async () => {
+    if (!navigator.requestMIDIAccess) { midiStatus.textContent = 'Web MIDI not supported in this browser'; return; }
+    try {
+      midiAccess = await navigator.requestMIDIAccess();
+      midiAccess.onstatechange = refreshInputs;
+      refreshInputs();
+    } catch (err) { midiStatus.textContent = 'MIDI access denied: ' + err.message; }
+  };
+  midiSelect.onchange = () => attachInput(midiSelect.value);
+
+  // ---------- Serial ----------
+  const serStatus = document.getElementById('ser-status');
+  const serConnect = document.getElementById('ser-connect');
+  const serReset = document.getElementById('ser-reset');
+  const serSave = document.getElementById('ser-save');
+  const serDelta = document.getElementById('ser-delta');
+  const serPeak = document.getElementById('ser-peak');
+  const serNoise = document.getElementById('ser-noise');
+  const serRateEl = document.getElementById('ser-rate');
+  let serMax = 5;
+  const serPlot = makePlot(document.getElementById('ser-plot'), () => serMax, 10);
+  let port = null, reader = null, serPeakVal = 0, lineCount = 0;
+  const capture = [];
+  const recent = [];   // [t, delta] for noise estimate
+
+  const deltaRe = /delta=\s*(-?\d+(?:\.\d+)?)/;
+
+  function handleLine(line) {
+    capture.push(line);
+    const m = deltaRe.exec(line);
+    if (!m) return;
+    lineCount++;
+    const d = parseFloat(m[1]);
+    serPeakVal = Math.max(serPeakVal, d);
+    serMax = Math.max(5, serPeakVal * 1.1);
+    serDelta.textContent = d.toFixed(2);
+    serPeak.textContent = serPeakVal.toFixed(2);
+    serPlot.push(Math.max(0, d));
+    const now = performance.now();
+    recent.push([now, d]);
+    while (recent.length && recent[0][0] < now - 2000) recent.shift();
+    if (recent.length > 5) {
+      let lo = Infinity, hi = -Infinity;
+      for (const [, v] of recent) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      // Only meaningful at rest; show it anyway, the user knows when they're blowing.
+      serNoise.textContent = (hi - lo).toFixed(2);
+    }
+  }
+
+  async function readLoop() {
+    const decoder = new TextDecoderStream();
+    port.readable.pipeTo(decoder.writable).catch(() => {});
+    reader = decoder.readable.getReader();
+    let buf = '';
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += value;
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          handleLine(buf.slice(0, i).replace(/\r$/, ''));
+          buf = buf.slice(i + 1);
+        }
+      }
+    } catch (err) {
+      serStatus.textContent = 'serial error: ' + err.message;
+    } finally {
+      serStatus.classList.remove('on');
+      serConnect.textContent = 'Connect serial';
+      port = null; reader = null;
+    }
+  }
+
+  serConnect.onclick = async () => {
+    if (!navigator.serial) { serStatus.textContent = 'Web Serial not supported in this browser'; return; }
+    if (port) { try { await reader.cancel(); await port.close(); } catch (_) {} return; }
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      serStatus.textContent = 'connected';
+      serStatus.classList.add('on');
+      serConnect.textContent = 'Disconnect';
+      serReset.disabled = serSave.disabled = false;
+      readLoop();
+    } catch (err) { serStatus.textContent = 'could not open port: ' + err.message; port = null; }
+  };
+  serReset.onclick = () => { serPeakVal = 0; serMax = 5; serPeak.textContent = '0.00'; serPlot.clear(); };
+  serSave.onclick = () => {
+    const blob = new Blob([capture.join('\n') + '\n'], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'breath-capture.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // ---------- animation + rates ----------
+  let lastRate = performance.now();
+  function frame() {
+    ccPlot.draw(); serPlot.draw();
+    const now = performance.now();
+    if (now - lastRate >= 1000) {
+      ccRateEl.textContent = ccCount; ccCount = 0;
+      serRateEl.textContent = lineCount; lineCount = 0;
+      lastRate = now;
+    }
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>
