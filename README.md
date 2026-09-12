@@ -23,12 +23,14 @@ Plus: ~3 mm ID silicone tubing and a mouthpiece (a straw will do to start).
 3. **Build the air path.** Tube + bleed hole + mouthpiece. See
    `docs/hardware.md`. Re-run the monitor and re-note the values; the bleed
    hole changes them a lot.
-4. **Send MIDI.** Copy `firmware/code.py`, `firmware/breath.py` and
-   `firmware/boot.py` to the board, set `THRESHOLD_HPA` / `FULL_SCALE_HPA` from step 3, and check the
+4. **Send MIDI.** Copy `firmware/code.py`, `firmware/breath.py`,
+   `firmware/tuning.py` and `firmware/boot.py` to the board, set `THRESHOLD_HPA` / `FULL_SCALE_HPA` from step 3, and check the
    "Breath Controller" device shows up in your DAW sending CC 2.
-5. **Tune feel.** `CURVE`, `SMOOTHING`, and bleed hole size, in a loop with
-   a breath-aware patch (a wind instrument or anything with CC 2 → volume /
-   filter).
+5. **Tune feel.** Move the sliders in `tools/bench.html` while playing a
+   breath-aware patch (a wind instrument or anything with CC 2 → volume /
+   filter), then paste the settings block it shows into `code.py`. Adjust
+   the bleed hole size in the same loop. `docs/tuning.md` maps symptoms to
+   which knob to turn.
 6. **Enclosure**, and if latency or jitter turns out to matter, port the
    loop to Arduino/C++ (Adafruit_BMP5xx + TinyUSB MIDI) on the same wiring.
 
@@ -46,8 +48,9 @@ Pico 2 W; only the wiring differs (see `docs/hardware.md`).
    - `adafruit_bus_device/` (folder)
    - `adafruit_register/` (folder)
    - `neopixel.mpy` (optional, QT Py only, onboard LED level meter)
-3. Copy `firmware/code.py`, `firmware/breath.py` and `firmware/boot.py` to
-   `CIRCUITPY/`. `boot.py` only takes effect after a power cycle.
+3. Copy `firmware/code.py`, `firmware/breath.py`, `firmware/tuning.py` and
+   `firmware/boot.py` to `CIRCUITPY/`. `boot.py` only takes effect after a
+   power cycle.
 
 `usb_midi` is built into CircuitPython, so no MIDI library is needed; the
 firmware writes the 3-byte CC messages directly.
@@ -58,15 +61,21 @@ firmware writes the 3-byte CC messages directly.
 |--------------------|------------------------------|---------|
 | CC 2 (breath)      | BMP585 pressure above ambient| on, 7-bit; `SEND_14BIT` adds CC 34 |
 
+The controller also **listens** on MIDI channel 16 for live tuning from the
+bench page (CC 20 threshold, 21 full scale, 22 curve, 23 smoothing, 24
+re-zero, 25 report settings) and echoes its current settings back on the
+same channel. Set `LIVE_TUNING = False` to disable.
+
 Channel 1. All of this is in the `TUNING` block at the top of
 `firmware/code.py`.
 
 ## Desktop tools
 
 - **`tools/bench.html`**: open in Chrome or Edge. Shows CC 2 live from the
-  controller over Web MIDI, and plots the pressure delta from the serial
-  console over Web Serial, with peak and rest-noise readouts for picking
-  `THRESHOLD_HPA` and `FULL_SCALE_HPA`. Can save a serial capture to a file.
+  controller over Web MIDI, has sliders that tune the running controller
+  and print the matching `code.py` lines, and plots the pressure delta from
+  the serial console over Web Serial, with peak and rest-noise readouts. Can
+  save a serial capture to a file.
 - **`tools/simulate.py`**: replays a synthetic breath phrase (or a saved
   capture with `--trace`) through the mapping and prints an ASCII plot, so
   you can compare `--curve` and `--smoothing` settings without hardware.
@@ -79,10 +88,12 @@ Channel 1. All of this is in the `TUNING` block at the top of
 ```
 firmware/code.py          main controller loop (sensor, MIDI, LED)
 firmware/breath.py        pressure -> CC mapping, board-independent
+firmware/tuning.py        live tuning over MIDI + minimal CC parser, board-independent
 firmware/boot.py          USB device name
 firmware/tools/           i2c_scan.py, monitor.py (bring-up and tuning, run on the board)
 tools/bench.html          browser MIDI meter + serial plotter
 tools/simulate.py         desktop replay of the mapping
-tests/test_breath.py      pytest suite for the mapping
+tests/                    pytest suites for the mapping and tuning modules
 docs/hardware.md          air path, moisture, bleed hole, wiring
+docs/tuning.md            what each constant does, symptoms -> fixes
 ```

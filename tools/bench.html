@@ -48,6 +48,13 @@
   .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
   .stat small { color: var(--muted); }
   .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .sliders { display: grid; grid-template-columns: 110px 1fr 70px; gap: 8px 12px;
+             align-items: center; }
+  .sliders label { color: var(--muted); }
+  .sliders output { font-variant-numeric: tabular-nums; text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+        padding: 10px 12px; margin: 10px 0 0; font-size: 13px; overflow-x: auto; }
   code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
 </style>
 </head>
@@ -70,6 +77,36 @@
       <div class="stat"><b id="cc-14">–</b><small>14-bit (CC 34 seen)</small></div>
     </div>
     <p class="hint">Runs against <code>firmware/code.py</code>. If nothing moves, check the input list shows "Breath Controller".</p>
+  </section>
+
+  <section>
+    <h2>Tuning <span id="tune-status" class="status">connect MIDI first</span></h2>
+    <div class="row">
+      <select id="midi-output" disabled></select>
+      <button id="tune-rezero" disabled>Re-zero</button>
+      <button id="tune-refresh" disabled>Read from device</button>
+    </div>
+    <div class="sliders">
+      <label for="t-threshold">threshold</label>
+      <input type="range" id="t-threshold" min="0" max="127" value="10" disabled>
+      <output id="o-threshold">0.50 hPa</output>
+      <label for="t-fullscale">full scale</label>
+      <input type="range" id="t-fullscale" min="0" max="127" value="40" disabled>
+      <output id="o-fullscale">25.0 hPa</output>
+      <label for="t-curve">curve</label>
+      <input type="range" id="t-curve" min="0" max="127" value="30" disabled>
+      <output id="o-curve">0.70</output>
+      <label for="t-smoothing">smoothing</label>
+      <input type="range" id="t-smoothing" min="0" max="127" value="40" disabled>
+      <output id="o-smoothing">0.35</output>
+    </div>
+    <pre id="tune-text">THRESHOLD_HPA = 0.50
+FULL_SCALE_HPA = 25.0
+CURVE = 0.70
+SMOOTHING = 0.35</pre>
+    <p class="hint">Changes apply on the controller immediately but are lost at reboot.
+      When it feels right, paste the block above into the TUNING section of <code>firmware/code.py</code>.
+      Needs <code>LIVE_TUNING = True</code> (the default).</p>
   </section>
 
   <section>
@@ -147,6 +184,7 @@
     midiInput.onmidimessage = (e) => {
       const [st, d1, d2] = e.data;
       if ((st & 0xF0) !== 0xB0) return;
+      if ((st & 0x0F) === TUNE_CH) { onTuningCC(d1, d2); return; }
       if (d1 === 34) { lsb = d2; seen14 = true; cc14El.textContent = 'yes'; return; }
       if (d1 !== 2) return;
       ccCount++;
@@ -178,12 +216,89 @@
   document.getElementById('midi-connect').onclick = async () => {
     if (!navigator.requestMIDIAccess) { midiStatus.textContent = 'Web MIDI not supported in this browser'; return; }
     try {
-      midiAccess = await navigator.requestMIDIAccess();
-      midiAccess.onstatechange = refreshInputs;
+      midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+      midiAccess.onstatechange = () => { refreshInputs(); refreshOutputs(); };
       refreshInputs();
+      refreshOutputs();
     } catch (err) { midiStatus.textContent = 'MIDI access denied: ' + err.message; }
   };
   midiSelect.onchange = () => attachInput(midiSelect.value);
+
+  // ---------- Tuning (mirrors firmware/tuning.py) ----------
+  const TUNE_CH = 15;
+  const TUNE = {
+    threshold: { cc: 20, lo: 0.0,  hi: 6.35, fmt: v => v.toFixed(2) + ' hPa', line: v => 'THRESHOLD_HPA = ' + v.toFixed(2) },
+    fullscale: { cc: 21, lo: 5.0,  hi: 68.5, fmt: v => v.toFixed(1) + ' hPa', line: v => 'FULL_SCALE_HPA = ' + v.toFixed(1) },
+    curve:     { cc: 22, lo: 0.3,  hi: 2.0,  fmt: v => v.toFixed(2),          line: v => 'CURVE = ' + v.toFixed(2) },
+    smoothing: { cc: 23, lo: 0.05, hi: 1.0,  fmt: v => v.toFixed(2),          line: v => 'SMOOTHING = ' + v.toFixed(2) },
+  };
+  const CC_REZERO = 24, CC_REPORT = 25;
+  const tuneStatus = document.getElementById('tune-status');
+  const midiOutSelect = document.getElementById('midi-output');
+  const tuneText = document.getElementById('tune-text');
+  const rezeroBtn = document.getElementById('tune-rezero');
+  const refreshBtn = document.getElementById('tune-refresh');
+  let midiOutput = null;
+
+  const ccToParam = (k, v) => TUNE[k].lo + (TUNE[k].hi - TUNE[k].lo) * v / 127;
+
+  function renderTuning() {
+    const lines = [];
+    for (const k of Object.keys(TUNE)) {
+      const v = ccToParam(k, +document.getElementById('t-' + k).value);
+      document.getElementById('o-' + k).textContent = TUNE[k].fmt(v);
+      lines.push(TUNE[k].line(v));
+    }
+    tuneText.textContent = lines.join('\n');
+  }
+
+  function sendTune(cc, value) {
+    if (!midiOutput) return;
+    midiOutput.send([0xB0 | TUNE_CH, cc, value & 0x7F]);
+  }
+
+  function setTuningEnabled(on) {
+    for (const k of Object.keys(TUNE)) document.getElementById('t-' + k).disabled = !on;
+    rezeroBtn.disabled = refreshBtn.disabled = !on;
+  }
+
+  for (const k of Object.keys(TUNE)) {
+    const el = document.getElementById('t-' + k);
+    el.oninput = () => { renderTuning(); sendTune(TUNE[k].cc, +el.value); };
+  }
+  rezeroBtn.onclick = () => sendTune(CC_REZERO, 127);
+  refreshBtn.onclick = () => sendTune(CC_REPORT, 127);
+
+  // Called from the MIDI input handler for CCs on the tuning channel.
+  function onTuningCC(cc, value) {
+    for (const k of Object.keys(TUNE)) {
+      if (TUNE[k].cc === cc) { document.getElementById('t-' + k).value = value; renderTuning(); return; }
+    }
+  }
+
+  function attachOutput(id) {
+    midiOutput = midiAccess.outputs.get(id) || null;
+    setTuningEnabled(!!midiOutput);
+    tuneStatus.textContent = midiOutput ? 'sending to ' + midiOutput.name : 'no MIDI output selected';
+    tuneStatus.classList.toggle('on', !!midiOutput);
+    if (midiOutput) sendTune(CC_REPORT, 127);
+  }
+
+  function refreshOutputs() {
+    midiOutSelect.innerHTML = '';
+    let pick = null;
+    for (const [id, out] of midiAccess.outputs) {
+      const o = document.createElement('option');
+      o.value = id; o.textContent = out.name;
+      midiOutSelect.appendChild(o);
+      if (!pick || /breath/i.test(out.name)) pick = id;
+    }
+    midiOutSelect.disabled = midiAccess.outputs.size === 0;
+    if (pick) { midiOutSelect.value = pick; attachOutput(pick); }
+    else attachOutput(null);
+  }
+  midiOutSelect.onchange = () => attachOutput(midiOutSelect.value);
+  renderTuning();
 
   // ---------- Serial ----------
   const serStatus = document.getElementById('ser-status');
