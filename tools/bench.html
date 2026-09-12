@@ -227,12 +227,12 @@ SMOOTHING = 0.35</pre>
   // ---------- Tuning (mirrors firmware/tuning.py) ----------
   const TUNE_CH = 15;
   const TUNE = {
-    threshold: { cc: 20, lo: 0.0,  hi: 6.35, fmt: v => v.toFixed(2) + ' hPa', line: v => 'THRESHOLD_HPA = ' + v.toFixed(2) },
-    fullscale: { cc: 21, lo: 5.0,  hi: 68.5, fmt: v => v.toFixed(1) + ' hPa', line: v => 'FULL_SCALE_HPA = ' + v.toFixed(1) },
-    curve:     { cc: 22, lo: 0.3,  hi: 2.0,  fmt: v => v.toFixed(2),          line: v => 'CURVE = ' + v.toFixed(2) },
-    smoothing: { cc: 23, lo: 0.05, hi: 1.0,  fmt: v => v.toFixed(2),          line: v => 'SMOOTHING = ' + v.toFixed(2) },
+    threshold: { cc: 40, lo: 0.0,  hi: 6.35, fmt: v => v.toFixed(2) + ' hPa', line: v => 'THRESHOLD_HPA = ' + v.toFixed(2) },
+    fullscale: { cc: 41, lo: 5.0,  hi: 68.5, fmt: v => v.toFixed(1) + ' hPa', line: v => 'FULL_SCALE_HPA = ' + v.toFixed(1) },
+    curve:     { cc: 42, lo: 0.3,  hi: 2.0,  fmt: v => v.toFixed(2),          line: v => 'CURVE = ' + v.toFixed(2) },
+    smoothing: { cc: 43, lo: 0.05, hi: 1.0,  fmt: v => v.toFixed(2),          line: v => 'SMOOTHING = ' + v.toFixed(2) },
   };
-  const CC_REZERO = 24, CC_REPORT = 25;
+  const CC_REZERO = 44, CC_REPORT = 45;
   const tuneStatus = document.getElementById('tune-status');
   const midiOutSelect = document.getElementById('midi-output');
   const tuneText = document.getElementById('tune-text');

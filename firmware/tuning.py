@@ -8,12 +8,15 @@ sync. Pure Python, shared between CircuitPython and the desktop tests.
 
 TUNE_CHANNEL = 15  # 0-based, i.e. MIDI channel 16
 
-CC_THRESHOLD = 20
-CC_FULL_SCALE = 21
-CC_CURVE = 22
-CC_SMOOTHING = 23
-CC_REZERO = 24
-CC_REPORT = 25
+# CC 40-45: chosen to stay clear of the spinning-wheel firmware's control
+# CCs (20 and 81-122) so the same tuning messages work when the breath
+# sensor is merged onto the wheel's Pico. Channel 16 is a second guard.
+CC_THRESHOLD = 40
+CC_FULL_SCALE = 41
+CC_CURVE = 42
+CC_SMOOTHING = 43
+CC_REZERO = 44
+CC_REPORT = 45
 
 # Slider value (0..127) <-> parameter, chosen so each CC step is a usable
 # increment and the default constants land on a whole number.

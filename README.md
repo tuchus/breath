@@ -62,8 +62,8 @@ firmware writes the 3-byte CC messages directly.
 | CC 2 (breath)      | BMP585 pressure above ambient| on, 7-bit; `SEND_14BIT` adds CC 34 |
 
 The controller also **listens** on MIDI channel 16 for live tuning from the
-bench page (CC 20 threshold, 21 full scale, 22 curve, 23 smoothing, 24
-re-zero, 25 report settings) and echoes its current settings back on the
+bench page (CC 40 threshold, 41 full scale, 42 curve, 43 smoothing, 44
+re-zero, 45 report settings) and echoes its current settings back on the
 same channel. Set `LIVE_TUNING = False` to disable.
 
 Channel 1. All of this is in the `TUNING` block at the top of
@@ -96,4 +96,5 @@ tools/simulate.py         desktop replay of the mapping
 tests/                    pytest suites for the mapping and tuning modules
 docs/hardware.md          air path, moisture, bleed hole, wiring
 docs/tuning.md            what each constant does, symptoms -> fixes
+docs/integration.md       plan for folding breath into the spinning wheel app and firmware
 ```
