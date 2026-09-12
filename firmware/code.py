@@ -1,6 +1,10 @@
 """USB MIDI breath controller for the Adafruit QT Py RP2040.
 
-Sensor (STEMMA QT):  QT Py -> BMP585 (0x47)
+Sensor:  BMP585 (I2C address 0x47)
+
+Runs unchanged on the QT Py RP2040 (STEMMA QT socket) or on a Raspberry Pi
+Pico / Pico 2 / Pico W / Pico 2 W (sensor wired to the pins in I2C_SDA /
+I2C_SCL below).
 
 The BMP585 barometric sensor, ported version, sits at the end of a tube from
 the mouthpiece.  Blowing raises the pressure above ambient; that delta is
@@ -31,10 +35,23 @@ SMOOTHING = 0.35          # 0..1, weight of the newest sample (1 = no smoothing)
 BASELINE_TRACK = 0.001    # how fast the ambient baseline follows slow drift
 BASELINE_SECONDS = 1.0    # ambient averaging time at boot (don't blow!)
 
+I2C_SDA = "GP4"           # Pico only: pins the BMP585 is wired to. Any I2C
+I2C_SCL = "GP5"           # pair works (GP4/GP5, GP6/GP7, GP8/GP9, ...).
+
 DEBUG = False             # print pressure/CC to the serial console ~10x/sec
 # --------------------------------------------------------------------------
 
-i2c = board.STEMMA_I2C()
+
+def open_i2c():
+    """STEMMA QT socket if the board has one, otherwise the pins above."""
+    if hasattr(board, "STEMMA_I2C"):
+        return board.STEMMA_I2C()
+    import busio
+
+    return busio.I2C(getattr(board, I2C_SCL), getattr(board, I2C_SDA))
+
+
+i2c = open_i2c()
 
 # --- BMP585 -----------------------------------------------------------------
 bmp = adafruit_bmp5xx.BMP5XX.over_i2c(i2c)
@@ -48,15 +65,24 @@ bmp.pressure_iir_filter = adafruit_bmp5xx.BMP5XX_IIR_FILTER_COEFF_3
 bmp.output_data_rate = adafruit_bmp5xx.BMP5XX_ODR_140_HZ
 bmp.mode = adafruit_bmp5xx.BMP5XX_POWERMODE_NORMAL
 
-# --- NeoPixel feedback (optional) -------------------------------------------
+# --- LED feedback (optional) ------------------------------------------------
+# QT Py: onboard NeoPixel shows the breath level. Pico: plain LED lights while
+# blowing above the threshold.
 pixel = None
+led = None
 try:
     import neopixel
 
     pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True)
     pixel.fill((0, 0, 40))
 except (ImportError, AttributeError):
-    pass
+    try:
+        import digitalio
+
+        led = digitalio.DigitalInOut(board.LED)
+        led.direction = digitalio.Direction.OUTPUT
+    except (ImportError, AttributeError):
+        pass
 
 # --- MIDI -------------------------------------------------------------------
 midi_out = usb_midi.ports[1]
@@ -127,6 +153,8 @@ while True:
         if pixel:
             level = int(shaped * 255)
             pixel.fill((level, 0, 40 - level * 40 // 255))
+        elif led is not None:
+            led.value = value > 0
 
     if DEBUG:
         now = time.monotonic()

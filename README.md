@@ -34,13 +34,18 @@ Plus: ~3 mm ID silicone tubing and a mouthpiece (a straw will do to start).
 
 ## Firmware setup (CircuitPython)
 
-1. Install the latest CircuitPython UF2 for the QT Py RP2040 (hold BOOT,
-   plug in, drop the `.uf2` onto `RPI-RP2`).
+The same firmware runs on the QT Py RP2040 or on a Raspberry Pi Pico /
+Pico 2 W; only the wiring differs (see `docs/hardware.md`).
+
+1. Install the latest CircuitPython UF2 for your board (hold BOOT / BOOTSEL,
+   plug in, drop the `.uf2` onto `RPI-RP2`). Flashing CircuitPython replaces
+   whatever firmware the board had, so keep a copy of the flywheel code if
+   you borrow its Pico.
 2. From the matching CircuitPython library bundle, copy to `CIRCUITPY/lib/`:
    - `adafruit_bmp5xx.mpy`
    - `adafruit_bus_device/` (folder)
    - `adafruit_register/` (folder)
-   - `neopixel.mpy` (optional, for the onboard LED level meter)
+   - `neopixel.mpy` (optional, QT Py only, onboard LED level meter)
 3. Copy `firmware/code.py` and `firmware/boot.py` to `CIRCUITPY/`.
    `boot.py` only takes effect after a power cycle.
 
