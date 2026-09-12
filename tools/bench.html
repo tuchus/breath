@@ -206,7 +206,7 @@ SMOOTHING = 0.35</pre>
       const o = document.createElement('option');
       o.value = id; o.textContent = inp.name;
       midiSelect.appendChild(o);
-      if (!pick || /breath/i.test(inp.name)) pick = id;
+      if (!pick || /breath/i.test(inp.name) || (/circuitpython/i.test(inp.name) && !/breath/i.test(midiAccess.inputs.get(pick).name))) pick = id;
     }
     midiSelect.disabled = midiAccess.inputs.size === 0;
     if (pick) { midiSelect.value = pick; attachInput(pick); }
@@ -291,7 +291,7 @@ SMOOTHING = 0.35</pre>
       const o = document.createElement('option');
       o.value = id; o.textContent = out.name;
       midiOutSelect.appendChild(o);
-      if (!pick || /breath/i.test(out.name)) pick = id;
+      if (!pick || /breath/i.test(out.name) || (/circuitpython/i.test(out.name) && !/breath/i.test(midiAccess.outputs.get(pick).name))) pick = id;
     }
     midiOutSelect.disabled = midiAccess.outputs.size === 0;
     if (pick) { midiOutSelect.value = pick; attachOutput(pick); }

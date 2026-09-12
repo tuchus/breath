@@ -34,6 +34,17 @@ Plus: ~3 mm ID silicone tubing and a mouthpiece (a straw will do to start).
 6. **Enclosure**, and if latency or jitter turns out to matter, port the
    loop to Arduino/C++ (Adafruit_BMP5xx + TinyUSB MIDI) on the same wiring.
 
+## Two ways to run it
+
+- **Standalone** (this repo): its own board, its own USB cable, enumerates as
+  "Breath Controller". What the rest of this README describes.
+- **On the spinning wheel's Pico**: the same sensor and the same `breath.py`
+  and `tuning.py`, folded into the wheel firmware in `tuchus/spinning-wheel-v2`
+  (branch `claude/breath-phase-b`, wiring in its `firmware/NEW-BOARD.md`).
+  Breath then leaves on the wheel's port and the bench page below tunes it
+  the same way, picking the wheel's "CircuitPython" port when no "Breath
+  Controller" is present. The plan for both sides: `docs/integration.md`.
+
 ## Firmware setup (CircuitPython)
 
 The same firmware runs on the QT Py RP2040 or on a Raspberry Pi Pico /

@@ -27,7 +27,9 @@ STUDIO > MIDI, BREATH OUT, the BREATH port button under CONNECT). Syntax
 checked against JUCE 8.0.8 headers on Linux; not yet built with MSVC or run
 through `--smoke` / `render-check.ps1`, which is the next step on the PC.
 The decisions below are all settings now, defaulting to off, so nothing is
-decided by the code.
+decided by the code. Same day, later: BREATH GATE (the RHYTHM lane follows
+the air), a `--render breath=` argument and four render-check cases, and a
+BREATH section in the wheel repo's `docs/HANDOFF.md`.
 
 All in `app/Source`. Order matters: the reading first, then the places it
 shows up, then the musical use.
@@ -180,6 +182,8 @@ Ideas in rough order of payoff, none of them needed to start:
 
 - **Breath gates the ENGINES lane.** Rhythm stops when you stop blowing, like
   a saxophonist's band. One multiply in the ENGINES lane's level.
+  *Done 2026-09-12 on the phase A branch as BREATH GATE (OFF / RHYTHM), off
+  by default, with a render case `breath-gate-shut`.*
 - **Breath in the DRUMMER pad.** Breath is loudness, momentum is busyness.
 - **A BREATH scene dial default** on a couple of scenes (GLOW on TRIP, the
   bloom on COLOR POUR), so the picture breathes.
