@@ -20,6 +20,15 @@ change with zero app change.
 
 ## Phase A: the app learns breath (first, no firmware change)
 
+**Status 2026-09-12: implemented on branch `claude/breath-phase-a` of
+`spinning-wheel-v2`** (Wheel decoder and second port, snapshot, MATRIX and
+scene dial source, telemetry column, EXPRESSION / VELOCITY / BOTH under
+STUDIO > MIDI, BREATH OUT, the BREATH port button under CONNECT). Syntax
+checked against JUCE 8.0.8 headers on Linux; not yet built with MSVC or run
+through `--smoke` / `render-check.ps1`, which is the next step on the PC.
+The decisions below are all settings now, defaulting to off, so nothing is
+decided by the code.
+
 All in `app/Source`. Order matters: the reading first, then the places it
 shows up, then the musical use.
 
