@@ -117,9 +117,10 @@ four more wires to the same carrier.
 
 ### B1. Wiring
 
-The AS5047P owns SPI0 on GP16 to GP19. The old AS5600 path used GP0/GP1 for
-I2C. Put the BMP585 on **GP4 (SDA) / GP5 (SCL)**, I2C0, so the AS5600
-fallback stays possible on GP0/GP1. Power from 3V3 OUT (pin 36), never VBUS.
+The AS5047P owns SPI0 on GP16 to GP19. The AS5600 fallback owns GP0/GP1,
+which is I2C0, and CircuitPython allows one bus object per peripheral. So
+the BMP585 goes on **I2C1: GP2 (SDA, physical pin 4) / GP3 (SCL, physical
+pin 5)**. Power from 3V3 OUT (pin 36), never VBUS.
 Four wires from a STEMMA QT to male-header cable (Adafruit 4209) into the
 screw terminals: black GND, red 3V3, blue SDA, yellow SCL. The breakout has
 its own pull-ups.
@@ -133,10 +134,16 @@ its own pull-ups.
 
 ### B3. `firmware/code.py` in the wheel repo
 
+**Status 2026-09-12: implemented on branch `claude/breath-phase-b` of
+`spinning-wheel-v2`**, as a `BreathInput` class plus three hooks in
+`main()`; `breath.py` and `tuning.py` copied in; `adafruit_bmp5xx.mpy` added
+to the manifest; wiring in `firmware/NEW-BOARD.md`. Compiles; not yet run on
+the board.
+
 Four small edits in `main()` (`code.py:4799` onward):
 
 1. **Init, optional.** After the sensor retry loop, try to open the BMP585 on
-   `busio.I2C(board.GP5, board.GP4, frequency=400_000)` with the same
+   `busio.I2C(board.GP3, board.GP2, frequency=400_000)` with the same
    `configure_sensor` routine as this repo's `code.py` (the ODR self-check).
    On any exception log once and set `bmp = None`: the wheel must never boot
    dead because the breath sensor is unplugged.
