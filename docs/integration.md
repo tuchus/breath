@@ -188,7 +188,9 @@ Ideas in rough order of payoff, none of them needed to start:
 - **A BREATH scene dial default** on a couple of scenes (GLOW on TRIP, the
   bloom on COLOR POUR), so the picture breathes.
 - **Ride files.** When CAPTURE and REC merge (V10 idea 4), breath is one more
-  column to record and replay.
+  column to record and replay. *Done 2026-09-12 on the phase A branch: the
+  wheel row's eighth field, -1 while no controller is live; replay feeds it
+  back as a live breath.*
 - **Bite or tilt** as a second axis, if the mouthpiece grows a lever. The
   AS5600 that came out of this repo would do it, and its driver is already
   in the wheel's lib folder.
