@@ -92,10 +92,12 @@ without breath.
   complexity; leave that as a follow-up unless it falls out for free.
 - **CC OUT** (`Rack.cpp:1112`): CC 2 currently carries **effort** to the
   plugins. Breath is CC 2 by MIDI convention, and a Pigments patch will
-  expect breath on it. Decision for Ross: either move effort to CC 3 and put
-  breath on CC 2, or leave effort and send breath on CC 11 only. I'd move
-  effort; nothing shipped depends on it and CC 2 = effort was a placeholder
-  name for "how hard you're working", which breath now literally is.
+  expect breath on it. Decision for Ross: either move effort to CC 4 and put
+  breath on CC 2, or leave effort and send breath on CC 11 only. (CC 3 went
+  to torque on 2026-09-12, with CC 9 energy and CC 12 drag, so CC 4 is the
+  free one.) I'd move effort; nothing shipped depends on it and CC 2 =
+  effort was a placeholder name for "how hard you're working", which breath
+  now literally is.
 
 ### A5. Checks
 
@@ -182,7 +184,7 @@ Ideas in rough order of payoff, none of them needed to start:
 
 ## Decisions for Ross before Phase A starts
 
-1. CC OUT: move effort to CC 3 so breath can be CC 2, or keep effort and send
+1. CC OUT: move effort to CC 4 so breath can be CC 2, or keep effort and send
    breath on CC 11 only?
 2. Default musical role: EXPRESSION only (my pick), or VELOCITY too?
 3. Where the sensor lives long-term: separate board (two USB cables, no
